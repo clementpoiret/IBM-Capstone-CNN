@@ -17,58 +17,84 @@
 
 # Import Libraries
 import os
-
+import datetime
 import numpy as np
+import tensorflow as tf
 
-import src.etl.etl as etl
+import src.etl as etl
+import src.model as md
 
 # Global Variables
 IMG_PATH = "/mnt/HDD/Documents/Datasets/AAF/faces/"
 
 
+def setup_gpus():
+    gpus = tf.config.experimental.list_physical_devices('GPU')
+    if gpus:
+        try:
+            # Currently, memory growth needs to be the same across GPUs
+            for gpu in gpus:
+                tf.config.experimental.set_memory_growth(gpu, True)
+                logical_gpus = tf.config.experimental.list_logical_devices(
+                    'GPU')
+                print(len(gpus), "Physical GPUs,", len(logical_gpus),
+                      "Logical GPUs")
+        except RuntimeError as e:
+            # Memory growth must be set before GPUs have been initialized
+            print(e)
+
+
 def main():
-    etl.arrange_images(path_in=IMG_PATH,
-                       path_train="./data/train/",
-                       path_test="./data/test/",
-                       a=0,
-                       b=7381,
-                       name="female",
-                       test_prop=.1,
-                       seed=2019)
-    etl.arrange_images(path_in=IMG_PATH,
-                       path_train="./data/train/",
-                       path_test="./data/test/",
-                       a=7381,
-                       b=13322,
-                       name="male",
-                       test_prop=.1,
-                       seed=2019)
+    setup_gpus()
+    #config = tf.compat.v1.ConfigProto()
+    #config.gpu_options.allow_growth = True
+    #config.gpu_options.per_process_gpu_memory_fraction = 1.0
+    #session = tf.compat.v1.Session(config=config)
 
-    train_generator = train_datagen.flow_from_directory(
-        directory=r"./train/",
-        target_size=(224, 224),
-        color_mode="rgb",
-        batch_size=32,
-        class_mode="categorical",
-        shuffle=True,
-        seed=42)
+    #gpus = tf.config.experimental.list_physical_devices('GPU')
+    #tf.config.experimental.set_memory_growth(gpus[0], True)
+    #tf.config.experimental.set_virtual_device_configuration(
+    #    gpus[0],
+    #    [tf.config.experimental.VirtualDeviceConfiguration(memory_limit=7979)])
 
-    images = np.array(os.listdir(IMG_PATH))
-    images.sort()
+    #tf.config.gpu.set_per_process_memory_fraction(1)
+    #tf.config.gpu.set_per_process_memory_growth(True)
 
-    ages = np.array([int(img[-6:-4]) for img in images])
+    if not os.path.exists("./data/train"):
+        etl.arrange_images(path_in=IMG_PATH,
+                           path_train="./data/train/",
+                           path_test="./data/test/",
+                           a=0,
+                           b=7381,
+                           name="female",
+                           test_prop=.1,
+                           seed=2019)
 
-    sns.distplot(ages)
-    plt.show()
-    ages.min()
-    ages.max()
-    ages.mean()
-    ss.skew(ages)
-    ss.kurtosis(ages)
+        etl.arrange_images(path_in=IMG_PATH,
+                           path_train="./data/train/",
+                           path_test="./data/test/",
+                           a=7381,
+                           b=13322,
+                           name="male",
+                           test_prop=.1,
+                           seed=2019)
 
-    sns.distplot(ages[:7381])
-    sns.distplot(ages[7381:])
-    plt.savefig("dist.png")
+    log_dir = "logs/fit/" + datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
+    tensorboard_callback = tf.keras.callbacks.TensorBoard(log_dir=log_dir,
+                                                          histogram_freq=1)
+
+    model = md.build_model()
+
+    training_set, test_set = etl.get_sets(
+        "/home/clementpoiret/Documents/Datasets/data/train",
+        "/home/clementpoiret/Documents/Datasets/data/test")
+
+    history = model.fit_generator(training_set,
+                                  steps_per_epoch=12028,
+                                  epochs=25,
+                                  validation_data=test_set,
+                                  validation_steps=1294,
+                                  callbacks=[tensorboard_callback])
 
 
 if __name__ == "__main__":
