@@ -83,18 +83,16 @@ def main():
     tensorboard_callback = tf.keras.callbacks.TensorBoard(log_dir=log_dir,
                                                           histogram_freq=1)
 
-    model = md.build_model()
+    classifier = md.build_classifier()
 
     training_set, test_set = etl.get_sets(
         "/home/clementpoiret/Documents/Datasets/data/train",
         "/home/clementpoiret/Documents/Datasets/data/test")
 
-    history = model.fit_generator(training_set,
-                                  steps_per_epoch=12028,
-                                  epochs=25,
-                                  validation_data=test_set,
-                                  validation_steps=1294,
-                                  callbacks=[tensorboard_callback])
+    history = classifier.fit_generator(training_set,
+                                       epochs=25,
+                                       validation_data=test_set,
+                                       callbacks=[tensorboard_callback])
 
 
 if __name__ == "__main__":

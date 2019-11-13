@@ -43,16 +43,15 @@ def get_sets(train_path, test_path):
     test_datagen = ImageDataGenerator()
 
     training_set = train_datagen.flow_from_directory(train_path,
-                                                     target_size=(224, 224),
+                                                     target_size=(256, 256),
                                                      color_mode="rgb",
-                                                     batch_size=32,
+                                                     batch_size=16,
                                                      class_mode="binary",
-                                                     shuffle=True,
-                                                     seed=42)
+                                                     shuffle=True)
 
     test_set = test_datagen.flow_from_directory(test_path,
-                                                target_size=(224, 224),
-                                                batch_size=32,
+                                                target_size=(256, 256),
+                                                batch_size=16,
                                                 class_mode="binary")
 
     return training_set, test_set
