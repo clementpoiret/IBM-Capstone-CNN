@@ -47,7 +47,7 @@ def build_classifier():
 
     classifier.add(Dense(units=1, activation="sigmoid"))
 
-    classifier.compile(optimizer="rmsprop",
+    classifier.compile(optimizer="adam",
                        loss="binary_crossentropy",
                        metrics=["accuracy"])
 

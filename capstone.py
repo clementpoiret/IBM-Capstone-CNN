@@ -17,6 +17,7 @@
 
 # Import Libraries
 import os
+import subprocess
 import datetime
 import numpy as np
 import tensorflow as tf
@@ -28,15 +29,49 @@ import src.model as md
 IMG_PATH = "/mnt/HDD/Documents/Datasets/AAF/faces/"
 
 
-def setup_gpus():
+def get_gpus_memory():
+    """Get the max gpu memory.
+
+    Returns
+    -------
+    usage: list
+        Returns a list of total memory for each gpus.
+    """
+    result = subprocess.check_output([
+        "nvidia-smi", "--query-gpu=memory.total",
+        "--format=csv,nounits,noheader"
+    ]).decode("utf-8")
+
+    gpus_memory = [int(x) for x in result.strip().split('\n')]
+    return gpus_memory
+
+
+def setup_gpus(allow_growth=True, memory_fraction=.9):
+    """Setup GPUs.
+    
+    Parameters:
+    allow_growth (Boolean)
+    memory_fraction (Float): Set maximum memory usage, with 1 using
+        maximum memory
+    """
     gpus = tf.config.experimental.list_physical_devices('GPU')
     if gpus:
         try:
             # Currently, memory growth needs to be the same across GPUs
-            for gpu in gpus:
-                tf.config.experimental.set_memory_growth(gpu, True)
+            for i, gpu in enumerate(gpus):
+                memory = get_gpus_memory()[i]
+
+                tf.config.experimental.set_memory_growth(gpu, allow_growth)
+
+                # Setting memory limit to max*fraction
+                tf.config.experimental.set_virtual_device_configuration(
+                    gpu, [
+                        tf.config.experimental.VirtualDeviceConfiguration(
+                            memory_limit=memory * memory_fraction)
+                    ])
+
                 logical_gpus = tf.config.experimental.list_logical_devices(
-                    'GPU')
+                    "GPU")
                 print(len(gpus), "Physical GPUs,", len(logical_gpus),
                       "Logical GPUs")
         except RuntimeError as e:
@@ -45,20 +80,7 @@ def setup_gpus():
 
 
 def main():
-    setup_gpus()
-    #config = tf.compat.v1.ConfigProto()
-    #config.gpu_options.allow_growth = True
-    #config.gpu_options.per_process_gpu_memory_fraction = 1.0
-    #session = tf.compat.v1.Session(config=config)
-
-    #gpus = tf.config.experimental.list_physical_devices('GPU')
-    #tf.config.experimental.set_memory_growth(gpus[0], True)
-    #tf.config.experimental.set_virtual_device_configuration(
-    #    gpus[0],
-    #    [tf.config.experimental.VirtualDeviceConfiguration(memory_limit=7979)])
-
-    #tf.config.gpu.set_per_process_memory_fraction(1)
-    #tf.config.gpu.set_per_process_memory_growth(True)
+    setup_gpus(allow_growth=True, memory_fraction=.95)
 
     if not os.path.exists("./data/train"):
         etl.arrange_images(path_in=IMG_PATH,
@@ -90,8 +112,9 @@ def main():
         "/home/clementpoiret/Documents/Datasets/data/test")
 
     history = classifier.fit_generator(training_set,
-                                       epochs=25,
+                                       epochs=128,
                                        validation_data=test_set,
+                                       use_multiprocessing=True,
                                        callbacks=[tensorboard_callback])
 
 
