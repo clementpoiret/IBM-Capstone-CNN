@@ -64,23 +64,28 @@ def setup_gpus(allow_growth=True, memory_fraction=.9):
                 tf.config.experimental.set_memory_growth(gpu, allow_growth)
 
                 # Setting memory limit to max*fraction
-                tf.config.experimental.set_virtual_device_configuration(
-                    gpu, [
-                        tf.config.experimental.VirtualDeviceConfiguration(
-                            memory_limit=memory * memory_fraction)
-                    ])
+                if memory_fraction:
+                    tf.config.experimental.set_virtual_device_configuration(
+                        gpu, [
+                            tf.config.experimental.VirtualDeviceConfiguration(
+                                memory_limit=memory * memory_fraction)
+                        ])
 
-                logical_gpus = tf.config.experimental.list_logical_devices(
-                    "GPU")
-                print(len(gpus), "Physical GPUs,", len(logical_gpus),
-                      "Logical GPUs")
+                print("GPU#{} Memory:{}, allow_growth={}, memory_fraction={}".
+                      format(i, memory, allow_growth, memory_fraction))
+
+            logical_gpus = tf.config.experimental.list_logical_devices("GPU")
+
+            print("{} Physical GPUs, {} Logical GPUs.".format(
+                len(gpus), len(logical_gpus)))
+
         except RuntimeError as e:
             # Memory growth must be set before GPUs have been initialized
             print(e)
 
 
 def main():
-    setup_gpus(allow_growth=True, memory_fraction=.95)
+    setup_gpus(allow_growth=True, memory_fraction=None)
 
     if not os.path.exists("./data/train"):
         etl.arrange_images(path_in=IMG_PATH,
@@ -108,14 +113,16 @@ def main():
     classifier = md.build_classifier()
 
     training_set, test_set = etl.get_sets(
-        "/home/clementpoiret/Documents/Datasets/data/train",
-        "/home/clementpoiret/Documents/Datasets/data/test")
+        #"/home/clementpoiret/Documents/Datasets/data/train",
+        #"/home/clementpoiret/Documents/Datasets/data/test"
+        "./data/train",
+        "./data/test")
 
-    history = classifier.fit_generator(training_set,
-                                       epochs=128,
-                                       validation_data=test_set,
-                                       use_multiprocessing=True,
-                                       callbacks=[tensorboard_callback])
+    history = classifier.fit_generator(
+        training_set,
+        epochs=128,  #validation_data=test_set,
+        use_multiprocessing=True,
+        callbacks=[tensorboard_callback])
 
 
 if __name__ == "__main__":

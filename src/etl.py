@@ -56,7 +56,9 @@ def get_sets(train_path, test_path):
 
     test_set = test_datagen.flow_from_directory(test_path,
                                                 target_size=(256, 256),
+                                                color_mode="rgb",
                                                 batch_size=16,
-                                                class_mode="binary")
+                                                class_mode="binary",
+                                                shuffle=True)
 
     return training_set, test_set

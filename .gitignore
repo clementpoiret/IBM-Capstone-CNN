@@ -1,4 +1,5 @@
 .vscode/
 data/
+data2/
 logs/
 *.pyc
