@@ -59,7 +59,7 @@ def main():
     target_size = (224, 224)
     input_shape = (224, 224, 3)
     color_mode = "rgb"
-    batch_size = 1
+    batch_size = 8
 
     X_train, y_train, y_train_age = etl.get_sets(train_path="./data/train",
                                                  test_path="./data/test",
@@ -69,15 +69,33 @@ def main():
     #X_train = np.array([X_train[0]])
     #y_train_age = np.array([0, 1]).reshape(-1, 1)
 
-    _, classes = y_train.shape
-    classifier = md.build_classifier(input_shape=input_shape, classes=classes)
+    _, n_genders = y_train.shape
+    _, n_ages = y_train_age.shape
 
-    history = classifier.fit(x=X_train,
-                             y=y_train_age,
-                             shuffle=True,
-                             callbacks=[tensorboard_callback],
-                             batch_size=batch_size,
-                             epochs=60)
+    loss_funcs = {
+        "genders": "categorical_crossentropy",
+        "ages": "categorical_crossentropy"
+    }
+    loss_weights = {"genders": 0.8, "ages": 1.0}
+    metrics = {"genders": "accuracy", "ages": "accuracy"}
+    y_trains = {"genders": y_train, "ages": y_train_age}
+    #    y_valids = {
+    #        "genders": y_test,
+    #        "ages": y_test_age
+    #    }
+    model = md.build_classifier(input_shape=input_shape,
+                                n_genders=n_genders,
+                                n_ages=n_ages,
+                                loss_funcs=loss_funcs,
+                                loss_weights=loss_weights,
+                                metrics=metrics)
+
+    history = model.fit(x=X_train,
+                        y=y_trains,
+                        shuffle=True,
+                        callbacks=[tensorboard_callback],
+                        batch_size=batch_size,
+                        epochs=60)
 
 
 if __name__ == "__main__":

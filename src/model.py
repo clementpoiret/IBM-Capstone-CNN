@@ -97,7 +97,12 @@ def convolutional_block(X, f, filters, stage, block, s=2):
     return X
 
 
-def build_classifier(input_shape=(256, 256, 3), classes=2):
+def build_classifier(loss_funcs,
+                     n_genders,
+                     n_ages,
+                     metrics,
+                     loss_weights,
+                     input_shape=(256, 256, 3)):
     X_input = Input(shape=input_shape)
 
     X = ZeroPadding2D((3, 3))(X_input)
@@ -141,30 +146,53 @@ def build_classifier(input_shape=(256, 256, 3), classes=2):
     X = identity_block(X, 3, [256, 256, 1024], stage=4, block="e")
     X = identity_block(X, 3, [256, 256, 1024], stage=4, block="f")
 
-    X = convolutional_block(X,
-                            f=3,
-                            filters=[512, 512, 2048],
-                            stage=5,
-                            block="a",
-                            s=2)
-    X = identity_block(X, 3, [512, 512, 2048], stage=5, block="b")
-    X = identity_block(X, 3, [512, 512, 2048], stage=5, block="c")
+    genders = convolutional_block(X,
+                                  f=3,
+                                  filters=[512, 512, 2048],
+                                  stage=5,
+                                  block="gender_a",
+                                  s=2)
+    genders = identity_block(genders,
+                             3, [512, 512, 2048],
+                             stage=5,
+                             block="gender_b")
+    genders = identity_block(genders,
+                             3, [512, 512, 2048],
+                             stage=5,
+                             block="gender_c")
 
-    X = AveragePooling2D(pool_size=(2, 2), padding="same")(X)
+    genders = AveragePooling2D(pool_size=(2, 2), padding="same")(genders)
 
-    X = Flatten()(X)
+    genders = Flatten()(genders)
 
-    act_function = "softmax"
-    loss = "categorical_crossentropy"
-    n_outputs = classes
+    genders = Dense(n_genders,
+                    activation="softmax",
+                    name="genders",
+                    kernel_initializer=GlorotUniform(seed=2019))(genders)
 
-    X = Dense(n_outputs,
-              activation=act_function,
-              name="fc" + str(n_outputs),
-              kernel_initializer=GlorotUniform(seed=2019))(X)
+    ages = convolutional_block(X,
+                               f=3,
+                               filters=[512, 512, 2048],
+                               stage=5,
+                               block="ages_a",
+                               s=2)
+    ages = identity_block(ages, 3, [512, 512, 2048], stage=5, block="ages_b")
+    ages = identity_block(ages, 3, [512, 512, 2048], stage=5, block="ages_c")
 
-    classifier = Model(inputs=X_input, outputs=X, name="ResNet50")
+    ages = AveragePooling2D(pool_size=(2, 2), padding="same")(ages)
 
-    classifier.compile(optimizer="SGD", loss=loss, metrics=["accuracy"])
+    ages = Flatten()(ages)
 
-    return classifier
+    ages = Dense(n_ages,
+                 activation="softmax",
+                 name="ages",
+                 kernel_initializer=GlorotUniform(seed=2019))(ages)
+
+    model = Model(inputs=X_input, outputs=[genders, ages], name="ResNet50")
+
+    model.compile(optimizer="SGD",
+                  loss=loss_funcs,
+                  loss_weights=loss_weights,
+                  metrics=metrics)
+
+    return model
