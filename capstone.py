@@ -17,75 +17,21 @@
 
 # Import Libraries
 import os
-import subprocess
 import datetime
 import numpy as np
+import pathlib
 import tensorflow as tf
 
 import src.etl as etl
 import src.model as md
+import src.hardware as hw
 
 # Global Variables
 IMG_PATH = "/mnt/HDD/Documents/Datasets/AAF/faces/"
 
 
-def get_gpus_memory():
-    """Get the max gpu memory.
-
-    Returns
-    -------
-    usage: list
-        Returns a list of total memory for each gpus.
-    """
-    result = subprocess.check_output([
-        "nvidia-smi", "--query-gpu=memory.total",
-        "--format=csv,nounits,noheader"
-    ]).decode("utf-8")
-
-    gpus_memory = [int(x) for x in result.strip().split('\n')]
-    return gpus_memory
-
-
-def setup_gpus(allow_growth=True, memory_fraction=.9):
-    """Setup GPUs.
-    
-    Parameters:
-    allow_growth (Boolean)
-    memory_fraction (Float): Set maximum memory usage, with 1 using
-        maximum memory
-    """
-    gpus = tf.config.experimental.list_physical_devices('GPU')
-    if gpus:
-        try:
-            # Currently, memory growth needs to be the same across GPUs
-            for i, gpu in enumerate(gpus):
-                memory = get_gpus_memory()[i]
-
-                tf.config.experimental.set_memory_growth(gpu, allow_growth)
-
-                # Setting memory limit to max*fraction
-                if memory_fraction:
-                    tf.config.experimental.set_virtual_device_configuration(
-                        gpu, [
-                            tf.config.experimental.VirtualDeviceConfiguration(
-                                memory_limit=memory * memory_fraction)
-                        ])
-
-                print("GPU#{} Memory:{}, allow_growth={}, memory_fraction={}".
-                      format(i, memory, allow_growth, memory_fraction))
-
-            logical_gpus = tf.config.experimental.list_logical_devices("GPU")
-
-            print("{} Physical GPUs, {} Logical GPUs.".format(
-                len(gpus), len(logical_gpus)))
-
-        except RuntimeError as e:
-            # Memory growth must be set before GPUs have been initialized
-            print(e)
-
-
 def main():
-    setup_gpus(allow_growth=True, memory_fraction=None)
+    hw.setup_gpus(allow_growth=True, memory_fraction=None)
 
     if not os.path.exists("./data/train"):
         etl.arrange_images(path_in=IMG_PATH,
@@ -110,19 +56,28 @@ def main():
     tensorboard_callback = tf.keras.callbacks.TensorBoard(log_dir=log_dir,
                                                           histogram_freq=1)
 
-    classifier = md.build_classifier()
+    target_size = (224, 224)
+    input_shape = (224, 224, 3)
+    color_mode = "rgb"
+    batch_size = 1
 
-    training_set, test_set = etl.get_sets(
-        #"/home/clementpoiret/Documents/Datasets/data/train",
-        #"/home/clementpoiret/Documents/Datasets/data/test"
-        "./data/train",
-        "./data/test")
+    X_train, y_train, y_train_age = etl.get_sets(train_path="./data/train",
+                                                 test_path="./data/test",
+                                                 target_size=target_size,
+                                                 color_mode=color_mode)
+    y_train_age = tf.keras.utils.to_categorical(y_train_age)
+    #X_train = np.array([X_train[0]])
+    #y_train_age = np.array([0, 1]).reshape(-1, 1)
 
-    history = classifier.fit_generator(
-        training_set,
-        epochs=128,  #validation_data=test_set,
-        use_multiprocessing=True,
-        callbacks=[tensorboard_callback])
+    _, classes = y_train.shape
+    classifier = md.build_classifier(input_shape=input_shape, classes=classes)
+
+    history = classifier.fit(x=X_train,
+                             y=y_train_age,
+                             shuffle=True,
+                             callbacks=[tensorboard_callback],
+                             batch_size=batch_size,
+                             epochs=60)
 
 
 if __name__ == "__main__":

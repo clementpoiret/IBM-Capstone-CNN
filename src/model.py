@@ -154,14 +154,9 @@ def build_classifier(input_shape=(256, 256, 3), classes=2):
 
     X = Flatten()(X)
 
-    if classes == 2:
-        act_function = "sigmoid"
-        loss = "binary_crossentropy"
-        n_outputs = 1
-    else:
-        act_function = "softmax"
-        loss = "categorical_crossentropy"
-        n_outputs = classes
+    act_function = "softmax"
+    loss = "categorical_crossentropy"
+    n_outputs = classes
 
     X = Dense(n_outputs,
               activation=act_function,
@@ -170,6 +165,6 @@ def build_classifier(input_shape=(256, 256, 3), classes=2):
 
     classifier = Model(inputs=X_input, outputs=X, name="ResNet50")
 
-    classifier.compile(optimizer="adam", loss=loss, metrics=["accuracy"])
+    classifier.compile(optimizer="SGD", loss=loss, metrics=["accuracy"])
 
     return classifier

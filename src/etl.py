@@ -1,8 +1,11 @@
 import os
+import pathlib
 import random
+import shutil
 
 import numpy as np
-import shutil
+import tensorflow as tf
+from tensorflow.keras.preprocessing import image
 from tensorflow.keras.preprocessing.image import ImageDataGenerator
 
 
@@ -35,30 +38,36 @@ def arrange_images(path_in,
             shutil.copy(path_in + image, path + name + "/" + image)
 
 
-def get_sets(train_path, test_path):
-    train_datagen = ImageDataGenerator(rescale=1. / 255,
-                                       rotation_range=20,
-                                       zoom_range=0.15,
-                                       width_shift_range=0.2,
-                                       height_shift_range=0.2,
-                                       shear_range=0.15,
-                                       horizontal_flip=True,
-                                       fill_mode="nearest")
+def get_sets(train_path, test_path, target_size=(256, 256), color_mode="rgb"):
 
-    test_datagen = ImageDataGenerator(rescale=1. / 255)
+    train_path = pathlib.Path(train_path)
+    test_path = pathlib.Path(test_path)
 
-    training_set = train_datagen.flow_from_directory(train_path,
-                                                     target_size=(256, 256),
-                                                     color_mode="rgb",
-                                                     batch_size=16,
-                                                     class_mode="binary",
-                                                     shuffle=True)
+    X_train = []
+    y_train = []
+    y_train_age = []
 
-    test_set = test_datagen.flow_from_directory(test_path,
-                                                target_size=(256, 256),
-                                                color_mode="rgb",
-                                                batch_size=16,
-                                                class_mode="binary",
-                                                shuffle=True)
+    c = 0
+    for path in train_path.glob("*"):
+        images = list(path.glob("*"))
 
-    return training_set, test_set
+        for cat_img in images:
+            img = image.img_to_array(
+                image.load_img(cat_img,
+                               color_mode=color_mode,
+                               target_size=target_size,
+                               interpolation="nearest")) / 255
+
+            X_train.append(img)
+            y_train.append(c)
+            y_train_age.append(int(cat_img.stem[6:]))
+        c += 1
+
+    X_train = np.array(X_train)
+    y_train = np.array(y_train)
+    y_train = tf.keras.utils.to_categorical(y_train)
+    y_train_age = np.array(y_train_age, dtype=float).reshape(-1, 1)
+    y_train_age -= y_train_age.min()
+    y_train_age /= y_train_age.max()
+
+    return X_train, y_train, y_train_age
