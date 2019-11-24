@@ -1,9 +1,9 @@
 import tensorflow as tf
 from tensorflow.keras.initializers import GlorotUniform
-from tensorflow.keras.layers import (Activation, AveragePooling2D,
+from tensorflow.keras.layers import (Activation, Add, AveragePooling2D,
                                      BatchNormalization, Conv2D, Dense, Dropout,
                                      Flatten, Input, MaxPooling2D,
-                                     ZeroPadding2D, Add)
+                                     ZeroPadding2D)
 from tensorflow.keras.models import Model
 
 
@@ -102,6 +102,7 @@ def build_classifier(loss_funcs,
                      n_ages,
                      metrics,
                      loss_weights,
+                     optimizer,
                      input_shape=(256, 256, 3)):
     X_input = Input(shape=input_shape)
 
@@ -190,7 +191,7 @@ def build_classifier(loss_funcs,
 
     model = Model(inputs=X_input, outputs=[genders, ages], name="ResNet50")
 
-    model.compile(optimizer="SGD",
+    model.compile(optimizer=optimizer,
                   loss=loss_funcs,
                   loss_weights=loss_weights,
                   metrics=metrics)

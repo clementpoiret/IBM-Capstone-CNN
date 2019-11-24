@@ -16,15 +16,16 @@
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 # Import Libraries
-import os
 import datetime
-import numpy as np
+import os
 import pathlib
+
+import numpy as np
 import tensorflow as tf
 
 import src.etl as etl
-import src.model as md
 import src.hardware as hw
+import src.model as md
 
 # Global Variables
 IMG_PATH = "/mnt/HDD/Documents/Datasets/AAF/faces/"
@@ -59,33 +60,37 @@ def main():
     target_size = (224, 224)
     input_shape = (224, 224, 3)
     color_mode = "rgb"
-    batch_size = 8
+    batch_size = 16
 
+    print("Getting training set...")
     X_train, y_train, y_train_age = etl.get_sets(train_path="./data/train",
-                                                 test_path="./data/test",
                                                  target_size=target_size,
                                                  color_mode=color_mode)
-    y_train_age = tf.keras.utils.to_categorical(y_train_age)
-    #X_train = np.array([X_train[0]])
-    #y_train_age = np.array([0, 1]).reshape(-1, 1)
+
+    print("Getting test set...")
+    X_test, y_test, y_test_age = etl.get_sets(train_path="./data/test",
+                                              target_size=target_size,
+                                              color_mode=color_mode)
 
     _, n_genders = y_train.shape
     _, n_ages = y_train_age.shape
+
+    print("Got {} genders for {} ages".format(n_genders, n_ages))
 
     loss_funcs = {
         "genders": "categorical_crossentropy",
         "ages": "categorical_crossentropy"
     }
-    loss_weights = {"genders": 0.8, "ages": 1.0}
+    loss_weights = {"genders": 0.2, "ages": 1.0}
     metrics = {"genders": "accuracy", "ages": "accuracy"}
+    optimizer = "adam"
     y_trains = {"genders": y_train, "ages": y_train_age}
-    #    y_valids = {
-    #        "genders": y_test,
-    #        "ages": y_test_age
-    #    }
+    y_tests = {"genders": y_test, "ages": y_test_age}
+
     model = md.build_classifier(input_shape=input_shape,
                                 n_genders=n_genders,
                                 n_ages=n_ages,
+                                optimizer=optimizer,
                                 loss_funcs=loss_funcs,
                                 loss_weights=loss_weights,
                                 metrics=metrics)
@@ -93,9 +98,10 @@ def main():
     history = model.fit(x=X_train,
                         y=y_trains,
                         shuffle=True,
+                        validation_data=(X_test, y_tests),
                         callbacks=[tensorboard_callback],
                         batch_size=batch_size,
-                        epochs=60)
+                        epochs=35)
 
 
 if __name__ == "__main__":

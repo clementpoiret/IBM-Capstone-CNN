@@ -38,10 +38,9 @@ def arrange_images(path_in,
             shutil.copy(path_in + image, path + name + "/" + image)
 
 
-def get_sets(train_path, test_path, target_size=(256, 256), color_mode="rgb"):
+def get_sets(train_path, target_size=(256, 256), color_mode="rgb"):
 
     train_path = pathlib.Path(train_path)
-    test_path = pathlib.Path(test_path)
 
     X_train = []
     y_train = []
@@ -49,6 +48,7 @@ def get_sets(train_path, test_path, target_size=(256, 256), color_mode="rgb"):
 
     c = 0
     for path in train_path.glob("*"):
+        print("Loading class {}...".format(c))
         images = list(path.glob("*"))
 
         for cat_img in images:
@@ -67,5 +67,6 @@ def get_sets(train_path, test_path, target_size=(256, 256), color_mode="rgb"):
     y_train = np.array(y_train)
     y_train = tf.keras.utils.to_categorical(y_train)
     y_train_age = np.array(y_train_age).reshape(-1, 1)
+    y_train_age = tf.keras.utils.to_categorical(y_train_age)
 
     return X_train, y_train, y_train_age
