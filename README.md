@@ -6,7 +6,7 @@
 
 __________
 
-## Facial Analysis for Gender and Age Prediction with Convolutional Neural Network
+## Multi-Output Residual Network for Gender and Age Prediction
 
 ### Architectural Components Overview
 
@@ -15,13 +15,12 @@ __________
 
 #### Data Source
 
-##### Technology Choice
-
-##### Justification
-
-#### Enterprise Data
+The Data is coming from the following dataset: https://github.com/JingchunCheng/All-Age-Faces-Dataset. It is shared by Jingchun Cheng (chengjingchun@gmail,com) and contains 13322 faces distributed across all ages ranging from 2 to 80), including 7381 females and 5941 males. For this project, only «original images» will be used, without any preprocessing already made by the original poster. 
+The original naming convention for images is {ID}A{age}.png. Images in the range [0:7380] are female.
 
 ##### Technology Choice
+
+Network's Baseline is ResNet50.
 
 ##### Justification
 

@@ -38,7 +38,19 @@ def arrange_images(path_in,
             shutil.copy(path_in + image, path + name + "/" + image)
 
 
+train_path = "./data/train/"
+target_size = (256, 256)
+color_mode = "rgb"
+
+
 def get_sets(train_path, target_size=(256, 256), color_mode="rgb"):
+    datagen = ImageDataGenerator(featurewise_center=True,
+                                 featurewise_std_normalization=True,
+                                 rotation_range=20,
+                                 width_shift_range=0.2,
+                                 height_shift_range=0.2,
+                                 zoom_range=0.2,
+                                 horizontal_flip=True)
 
     train_path = pathlib.Path(train_path)
 
@@ -66,7 +78,9 @@ def get_sets(train_path, target_size=(256, 256), color_mode="rgb"):
     X_train = np.array(X_train)
     y_train = np.array(y_train)
     y_train = tf.keras.utils.to_categorical(y_train)
-    y_train_age = np.array(y_train_age).reshape(-1, 1)
-    y_train_age = tf.keras.utils.to_categorical(y_train_age)
+    y_train_age = np.array(y_train_age, dtype=float).reshape(-1, 1)
+    y_train_age -= y_train_age.min()
+    y_train_age /= y_train_age.max()
+    #y_train_age = tf.keras.utils.to_categorical(y_train_age)
 
     return X_train, y_train, y_train_age
