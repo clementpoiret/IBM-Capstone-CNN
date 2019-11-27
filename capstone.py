@@ -19,11 +19,13 @@
 import datetime
 import os
 import pathlib
+import time
 
 import numpy as np
 import tensorflow as tf
-from tensorflow.keras.callbacks import EarlyStopping, ModelCheckpoint, CSVLogger, Callback
 from sklearn.model_selection import KFold
+from tensorflow.keras.callbacks import (Callback, CSVLogger, EarlyStopping,
+                                        ModelCheckpoint)
 
 import src.etl as etl
 import src.hardware as hw
@@ -31,8 +33,6 @@ import src.model as md
 
 # Global Variables
 IMG_PATH = "/mnt/HDD/Documents/Datasets/AAF/faces/"
-
-import time
 
 
 class TimeHistory(Callback):
@@ -107,27 +107,16 @@ def main():
     loss_weights = {"genders": 0.4, "ages": 1.0}
     metrics = {"genders": "accuracy", "ages": "mse"}
     optimizer = "adam"
-
-    model = md.build_classifier(input_shape=input_shape,
-                                n_genders=n_genders,
-                                n_ages=n_ages,
-                                optimizer=optimizer,
-                                loss_funcs=loss_funcs,
-                                loss_weights=loss_weights,
-                                metrics=metrics,
-                                stages=4,
-                                strides=[1, 2, 2, 2],
-                                n_identities=[2, 3, 5, 2],
-                                bifurcation_stage=3)
-
-    print(model.summary())
+    stages = 4
+    bifurcation_stage = 3
 
     kf = KFold(n_splits=10, shuffle=True)
 
     for i, (train_index, test_index) in enumerate(kf.split(X_train, y_train)):
         time_callback = TimeHistory()
         csv_logger = CSVLogger(
-            "./logs/callbacks/training_{}_{}_split{}.log".format(4, 3, i))
+            "./logs/callbacks/training_{}_{}_split{}.log".format(
+                stages, bifurcation_stage, i))
 
         X_train_split, X_test_split = X_train[train_index], X_train[test_index]
         y_train_gender_split, y_test_gender_split = y_train[
@@ -137,6 +126,19 @@ def main():
 
         y_trains = {"genders": y_train_gender_split, "ages": y_train_age_split}
         y_tests = {"genders": y_test_gender_split, "ages": y_age_gender_split}
+
+        model = md.build_classifier(input_shape=input_shape,
+                                    n_genders=n_genders,
+                                    n_ages=n_ages,
+                                    optimizer=optimizer,
+                                    loss_funcs=loss_funcs,
+                                    loss_weights=loss_weights,
+                                    metrics=metrics,
+                                    stages=stages,
+                                    strides=[1, 2, 2, 2],
+                                    n_identities=[2, 3, 5, 2],
+                                    bifurcation_stage=bifurcation_stage)
+        print(model.summary())
 
         model.fit(
             x=X_train_split,
