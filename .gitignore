@@ -5,3 +5,4 @@ data3/
 data4/
 logs/
 *.pyc
+best_model.h5

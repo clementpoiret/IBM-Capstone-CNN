@@ -205,18 +205,28 @@ def convolutional_block_v2(X, f, filters, stage, block, s=2):
     return X
 
 
-def build_classifier_v1(loss_funcs,
-                        n_genders,
-                        n_ages,
-                        metrics,
-                        loss_weights,
-                        optimizer,
-                        input_shape=(256, 256, 3),
-                        stages=4,
-                        strides=[1, 2, 2, 2],
-                        n_identities=[2, 3, 5, 2],
-                        initial_filter=np.array([64, 64, 256]),
-                        bifurcation_stage=3):
+def build_model(version,
+                loss_funcs,
+                n_genders,
+                n_ages,
+                metrics,
+                loss_weights,
+                optimizer,
+                input_shape=(256, 256, 3),
+                stages=4,
+                strides=[1, 2, 2, 2],
+                n_identities=[2, 3, 5, 2],
+                initial_filter=np.array([64, 64, 256]),
+                bifurcation_stage=3):
+
+    if version == 1:
+        convolutional_block = convolutional_block_v1
+        identity_block = identity_block_v1
+    elif version == 2:
+        convolutional_block = convolutional_block_v2
+        identity_block = identity_block_v2
+    else:
+        raise NameError("Unsupported Version '{}'".format(version))
 
     X_input = Input(shape=input_shape)
 
@@ -234,57 +244,62 @@ def build_classifier_v1(loss_funcs,
         s = strides[stage]
 
         if stage < bifurcation_stage:
-            X = convolutional_block_v1(X,
-                                       f=3,
-                                       filters=list(initial_filter * 2**stage),
-                                       stage=stage + 2,
-                                       block="a",
-                                       s=s)
+            X = convolutional_block(X,
+                                    f=3,
+                                    filters=list(initial_filter * 2**stage),
+                                    stage=stage + 2,
+                                    block="a",
+                                    s=s)
 
             n_identity = n_identities[stage]
             for block in ascii_lowercase[1:n_identity + 1]:
-                X = identity_block_v1(X,
-                                      3,
-                                      filters=list(initial_filter * 2**stage),
-                                      stage=stage + 2,
-                                      block=block)
+                X = identity_block(X,
+                                   3,
+                                   filters=list(initial_filter * 2**stage),
+                                   stage=stage + 2,
+                                   block=block)
         else:
             if stage == bifurcation_stage:
                 genders = X
                 ages = X
-            genders = convolutional_block_v1(genders,
-                                             f=3,
-                                             filters=list(initial_filter *
-                                                          2**stage),
-                                             stage=stage + 2,
-                                             block="gender_a",
-                                             s=s)
-            ages = convolutional_block_v1(ages,
+            genders = convolutional_block(genders,
                                           f=3,
                                           filters=list(initial_filter *
                                                        2**stage),
                                           stage=stage + 2,
-                                          block="age_a",
+                                          block="gender_a",
                                           s=s)
+            ages = convolutional_block(ages,
+                                       f=3,
+                                       filters=list(initial_filter * 2**stage),
+                                       stage=stage + 2,
+                                       block="age_a",
+                                       s=s)
 
             n_identity = n_identities[stage]
             for block in ascii_lowercase[1:n_identity + 1]:
-                genders = identity_block_v1(genders,
-                                            3,
-                                            filters=list(initial_filter *
-                                                         2**stage),
-                                            stage=stage + 2,
-                                            block="gender_{}".format(block))
-                ages = identity_block_v1(ages,
+                genders = identity_block(genders,
                                          3,
                                          filters=list(initial_filter *
                                                       2**stage),
                                          stage=stage + 2,
-                                         block="age_{}".format(block))
+                                         block="gender_{}".format(block))
+                ages = identity_block(ages,
+                                      3,
+                                      filters=list(initial_filter * 2**stage),
+                                      stage=stage + 2,
+                                      block="age_{}".format(block))
 
     if bifurcation_stage == stages:
         genders = X
         ages = X
+
+    if version == 2:
+        genders = BatchNormalization(axis=3)(genders)
+        ages = BatchNormalization(axis=3)(ages)
+
+        genders = Activation("relu")(genders)
+        ages = Activation("relu")(ages)
 
     genders = AveragePooling2D(pool_size=(2, 2), padding="same")(genders)
     ages = AveragePooling2D(pool_size=(2, 2), padding="same")(ages)
@@ -339,153 +354,7 @@ def build_classifier_v1(loss_funcs,
                   metrics=metrics)
 
     plot_model(model,
-               to_file="model_loop_{}_{}_v1.png".format(stages,
-                                                        bifurcation_stage))
-
-    return model
-
-
-def build_classifier_v2(loss_funcs,
-                        n_genders,
-                        n_ages,
-                        metrics,
-                        loss_weights,
-                        optimizer,
-                        input_shape=(256, 256, 3),
-                        stages=4,
-                        strides=[1, 2, 2, 2],
-                        n_identities=[2, 3, 5, 2],
-                        initial_filter=np.array([64, 64, 256]),
-                        bifurcation_stage=3):
-
-    X_input = Input(shape=input_shape)
-
-    X = ZeroPadding2D((3, 3))(X_input)
-
-    X = Conv2D(64, (7, 7),
-               strides=(2, 2),
-               name="conv1",
-               kernel_initializer=GlorotUniform(seed=2019))(X)
-    X = BatchNormalization(axis=3, name="bn_conv1")(X)
-    X = Activation("relu")(X)
-    X = MaxPooling2D((3, 3), strides=(2, 2))(X)
-
-    for stage in range(stages):
-        s = strides[stage]
-
-        if stage < bifurcation_stage:
-            X = convolutional_block_v2(X,
-                                       f=3,
-                                       filters=list(initial_filter * 2**stage),
-                                       stage=stage + 2,
-                                       block="a",
-                                       s=s)
-
-            n_identity = n_identities[stage]
-            for block in ascii_lowercase[1:n_identity + 1]:
-                X = identity_block_v2(X,
-                                      3,
-                                      filters=list(initial_filter * 2**stage),
-                                      stage=stage + 2,
-                                      block=block)
-        else:
-            if stage == bifurcation_stage:
-                genders = X
-                ages = X
-            genders = convolutional_block_v2(genders,
-                                             f=3,
-                                             filters=list(initial_filter *
-                                                          2**stage),
-                                             stage=stage + 2,
-                                             block="gender_a",
-                                             s=s)
-            ages = convolutional_block_v2(ages,
-                                          f=3,
-                                          filters=list(initial_filter *
-                                                       2**stage),
-                                          stage=stage + 2,
-                                          block="age_a",
-                                          s=s)
-
-            n_identity = n_identities[stage]
-            for block in ascii_lowercase[1:n_identity + 1]:
-                genders = identity_block_v2(genders,
-                                            3,
-                                            filters=list(initial_filter *
-                                                         2**stage),
-                                            stage=stage + 2,
-                                            block="gender_{}".format(block))
-                ages = identity_block_v2(ages,
-                                         3,
-                                         filters=list(initial_filter *
-                                                      2**stage),
-                                         stage=stage + 2,
-                                         block="age_{}".format(block))
-
-    if bifurcation_stage == stages:
-        genders = X
-        ages = X
-
-    genders = BatchNormalization(axis=3)(genders)
-    ages = BatchNormalization(axis=3)(ages)
-
-    genders = Activation("relu")(genders)
-    ages = Activation("relu")(ages)
-
-    genders = AveragePooling2D(pool_size=(2, 2), padding="same")(genders)
-    ages = AveragePooling2D(pool_size=(2, 2), padding="same")(ages)
-
-    genders = Flatten()(genders)
-    ages = Flatten()(ages)
-
-    genders = Dense(256,
-                    activation="relu",
-                    name="fc_genders_256_1",
-                    kernel_initializer=GlorotUniform(seed=2019),
-                    kernel_regularizer=regularizers.l1_l2(0.0001,
-                                                          0.0001))(genders)
-    genders = Dropout(rate=.2, seed=2019)(genders)
-    ages = Dense(256,
-                 activation="relu",
-                 name="fc_ages_256_1",
-                 kernel_initializer=GlorotUniform(seed=2019),
-                 kernel_regularizer=regularizers.l1_l2(0.0001, 0.0001))(ages)
-    ages = Dropout(rate=.2, seed=2019)(ages)
-
-    genders = Dense(128,
-                    activation="relu",
-                    name="fc_genders_256_2",
-                    kernel_initializer=GlorotUniform(seed=2019),
-                    kernel_regularizer=regularizers.l1_l2(0.0001,
-                                                          0.0001))(genders)
-    genders = Dropout(rate=.2, seed=2019)(genders)
-    ages = Dense(128,
-                 activation="relu",
-                 name="fc_ages_256_2",
-                 kernel_initializer=GlorotUniform(seed=2019),
-                 kernel_regularizer=regularizers.l1_l2(0.0001, 0.0001))(ages)
-    ages = Dropout(rate=.2, seed=2019)(ages)
-
-    genders = Dense(n_genders,
-                    activation="softmax",
-                    name="genders",
-                    kernel_initializer=GlorotUniform(seed=2019))(genders)
-    ages = Dense(n_ages,
-                 activation="sigmoid",
-                 name="ages",
-                 kernel_initializer=GlorotUniform(seed=2019))(ages)
-
-    model = Model(inputs=X_input,
-                  outputs=[genders, ages],
-                  name="ResNet50_mod{}{}".format(stages, bifurcation_stage))
-
-    model.compile(optimizer=optimizer,
-                  loss=loss_funcs,
-                  loss_weights=loss_weights,
-                  metrics=metrics)
-
-    plot_model(model,
-               to_file="model_loop_{}_{}_v2.png".format(stages,
-                                                        bifurcation_stage))
+               to_file="model_loop_{}_{}_v{}.png".format(
+                   stages, bifurcation_stage, version))
 
     return model

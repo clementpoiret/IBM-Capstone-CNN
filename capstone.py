@@ -127,17 +127,18 @@ def main():
         y_trains = {"genders": y_train_gender_split, "ages": y_train_age_split}
         y_tests = {"genders": y_test_gender_split, "ages": y_age_gender_split}
 
-        model = md.build_classifier_v2(input_shape=input_shape,
-                                       n_genders=n_genders,
-                                       n_ages=n_ages,
-                                       optimizer=optimizer,
-                                       loss_funcs=loss_funcs,
-                                       loss_weights=loss_weights,
-                                       metrics=metrics,
-                                       stages=stages,
-                                       strides=[1, 2, 2, 2],
-                                       n_identities=[2, 3, 5, 2],
-                                       bifurcation_stage=bifurcation_stage)
+        model = md.build_model(version=2,
+                               input_shape=input_shape,
+                               n_genders=n_genders,
+                               n_ages=n_ages,
+                               optimizer=optimizer,
+                               loss_funcs=loss_funcs,
+                               loss_weights=loss_weights,
+                               metrics=metrics,
+                               stages=stages,
+                               strides=[1, 2, 2, 2],
+                               n_identities=[2, 3, 5, 2],
+                               bifurcation_stage=bifurcation_stage)
         print(model.summary())
 
         model.fit(
@@ -145,7 +146,8 @@ def main():
             y=y_trains,
             shuffle=True,
             validation_data=(X_test_split, y_tests),
-            callbacks=[tensorboard_callback, es, mc, time_callback, csv_logger],
+            callbacks=[tensorboard_callback, es, time_callback,
+                       csv_logger],  #mc
             batch_size=batch_size,
             epochs=epochs)
 
