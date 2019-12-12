@@ -26,6 +26,7 @@ import tensorflow as tf
 from sklearn.model_selection import KFold
 from tensorflow.keras.callbacks import (Callback, CSVLogger, EarlyStopping,
                                         ModelCheckpoint)
+from tensorflow.keras.preprocessing import image
 
 import src.etl as etl
 import src.hardware as hw
@@ -47,7 +48,7 @@ class TimeHistory(Callback):
         self.times.append(time.time() - self.epoch_time_start)
 
 
-def main():
+def main(train=True, weights=None, test_image=None):
     hw.setup_gpus(allow_growth=True, memory_fraction=None)
 
     if not os.path.exists("./data/train"):
@@ -73,10 +74,6 @@ def main():
     tensorboard_callback = tf.keras.callbacks.TensorBoard(log_dir=log_dir,
                                                           histogram_freq=1)
     es = EarlyStopping(monitor="val_loss", mode="min", verbose=1, patience=30)
-    mc = ModelCheckpoint("best_model.h5",
-                         monitor="val_loss",
-                         mode="min",
-                         verbose=1)
 
     target_size = (224, 224)
     input_shape = (224, 224, 3)
@@ -112,21 +109,60 @@ def main():
 
     kf = KFold(n_splits=10, shuffle=True)
 
-    for i, (train_index, test_index) in enumerate(kf.split(X_train, y_train)):
-        time_callback = TimeHistory()
-        csv_logger = CSVLogger(
-            "./logs/callbacks/training_v2_{}_{}_split{}.log".format(
-                stages, bifurcation_stage, i))
+    if train:
+        for i, (train_index,
+                test_index) in enumerate(kf.split(X_train, y_train)):
+            time_callback = TimeHistory()
+            csv_logger = CSVLogger(
+                "./logs/callbacks/training_v2_{}_{}_split{}.log".format(
+                    stages, bifurcation_stage, i))
+            mc = ModelCheckpoint("best_model_v2_{}_{}.h5".format(
+                stages, bifurcation_stage, i),
+                                 monitor="val_loss",
+                                 mode="min",
+                                 verbose=1)
 
-        X_train_split, X_test_split = X_train[train_index], X_train[test_index]
-        y_train_gender_split, y_test_gender_split = y_train[
-            train_index], y_train[test_index]
-        y_train_age_split, y_age_gender_split = y_train_age[
-            train_index], y_train_age[test_index]
+            X_train_split, X_test_split = X_train[train_index], X_train[
+                test_index]
+            y_train_gender_split, y_test_gender_split = y_train[
+                train_index], y_train[test_index]
+            y_train_age_split, y_age_gender_split = y_train_age[
+                train_index], y_train_age[test_index]
 
-        y_trains = {"genders": y_train_gender_split, "ages": y_train_age_split}
-        y_tests = {"genders": y_test_gender_split, "ages": y_age_gender_split}
+            y_trains = {
+                "genders": y_train_gender_split,
+                "ages": y_train_age_split
+            }
+            y_tests = {
+                "genders": y_test_gender_split,
+                "ages": y_age_gender_split
+            }
 
+            model = md.build_model(version=2,
+                                   input_shape=input_shape,
+                                   n_genders=n_genders,
+                                   n_ages=n_ages,
+                                   optimizer=optimizer,
+                                   loss_funcs=loss_funcs,
+                                   loss_weights=loss_weights,
+                                   metrics=metrics,
+                                   stages=stages,
+                                   strides=[1, 2, 2, 2],
+                                   n_identities=[2, 3, 5, 2],
+                                   bifurcation_stage=bifurcation_stage)
+            print(model.summary())
+
+            model.fit(x=X_train_split,
+                      y=y_trains,
+                      shuffle=True,
+                      validation_data=(X_test_split, y_tests),
+                      callbacks=[
+                          tensorboard_callback, es, time_callback, csv_logger,
+                          mc
+                      ],
+                      batch_size=batch_size,
+                      epochs=epochs)
+    else:
         model = md.build_model(version=2,
                                input_shape=input_shape,
                                n_genders=n_genders,
@@ -140,17 +176,31 @@ def main():
                                n_identities=[2, 3, 5, 2],
                                bifurcation_stage=bifurcation_stage)
         print(model.summary())
+        model.load_weights(weights)
 
-        model.fit(
-            x=X_train_split,
-            y=y_trains,
-            shuffle=True,
-            validation_data=(X_test_split, y_tests),
-            callbacks=[tensorboard_callback, es, time_callback,
-                       csv_logger],  #mc
-            batch_size=batch_size,
-            epochs=epochs)
+        img = image.img_to_array(
+            image.load_img(test_image,
+                           color_mode=color_mode,
+                           target_size=target_size,
+                           interpolation="nearest")) / 255
+        img = img.reshape(-1, 224, 224, 3)
+        prediction = model.predict(img)
+        if np.argmax(prediction[0]) == 0:
+            g = "female"
+        else:
+            g = "male"
+        print("The photo is showing a {} years old {}.".format(
+            int(prediction[1][0][0] * 100), g))
 
 
 if __name__ == "__main__":
-    main()
+    train = input("Do you want to train the model? Yes/No?")
+    train = train == "Yes"
+    if not train:
+        weights = input("Path to your model's weights:")
+        test_image = input("Path to your test image:")
+    else:
+        weights = None
+        test_image = None
+
+    main(train, weights, test_image)

@@ -44,13 +44,13 @@ color_mode = "rgb"
 
 
 def get_sets(train_path, target_size=(256, 256), color_mode="rgb"):
-    datagen = ImageDataGenerator(featurewise_center=True,
-                                 featurewise_std_normalization=True,
-                                 rotation_range=20,
-                                 width_shift_range=0.2,
-                                 height_shift_range=0.2,
-                                 zoom_range=0.2,
-                                 horizontal_flip=True)
+    #datagen = ImageDataGenerator(featurewise_center=True,
+    #                             featurewise_std_normalization=True,
+    #                             rotation_range=20,
+    #                             width_shift_range=0.2,
+    #                             height_shift_range=0.2,
+    #                             zoom_range=0.2,
+    #                             horizontal_flip=True)
 
     train_path = pathlib.Path(train_path)
 
